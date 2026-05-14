@@ -269,6 +269,7 @@ def on_close():
 root.protocol("WM_DELETE_WINDOW", on_close)
 #added to the bottom of run cleanup on close instead of at top of program.
 root.bind("<Escape>", lambda e: on_close())
+root.after(500, lambda:root.focus_force())
 
 # ----- Start loops -----
 update()

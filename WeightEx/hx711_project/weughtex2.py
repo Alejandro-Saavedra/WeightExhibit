@@ -1,4 +1,4 @@
-import time
+#import time
 import tkinter as tk
 from PIL import Image, ImageTk
 
@@ -16,7 +16,7 @@ SCK_PIN = 5
 
 TARE_PIN = 17
 MOON_PIN = 12
-SUN_PIN = 18
+SUN_PIN = 18 # Pin has been physically changed from 16 to 18, will update documentation later
 MARS_PIN = 25
 JUP_PIN = 21
 SPACE_PIN = 22
@@ -131,23 +131,58 @@ def read_weight_grams():
     grams = (raw - OFFSET) / SCALE_FACTOR
     return grams, raw
 
+# ----- Message timer -----
+# will clear the message after a certain amount of time
+status_clear_job = None
+
+def show_status(message, duration=1500):
+    global status_clear_job
+
+    if status_clear_job is not None:
+        try:
+            root.after_cancel(status_clear_job)
+        except Exception:
+            pass
+
+    status_lbl.config(text=message)
+    status_clear_job = root.after(duration, lambda: status_lbl.config(text=""))
+
 def tare():
     global OFFSET
-    status_lbl.config(text="Resetting scale...")
+    #status_lbl.config(text="Resetting scale...")
+    show_status("Resetting scale...", 1000)
     root.update_idletasks()
 
     try:
         #raw = hx.get_data_mean(15), CHANGED TO 5
         raw = hx.get_data_mean(5)
     except Exception as e:
-        status_lbl.config(text=f"Tare failed: {e}")
+        #status_lbl.config(text=f"Tare failed: {e}")
+        show_status(f"Tare failed : {e}", 2000)
         return
-
+#Previous code, commented out to test new block
+    #if raw is not None:
+        #OFFSET = raw
+        #status_lbl.config(text="Tare complete")
+    #else:
+        #status_lbl.config(text="Tare failed")
     if raw is not None:
         OFFSET = raw
-        status_lbl.config(text="Tare complete")
+
+        # Return to Earth after tare
+        set_background(None)
+        title.config(text="Weight on Earth")
+
+        # Hide planet labels
+        hide_label("moon")
+        hide_label("mars")
+        hide_label("jupiter")
+        hide_label("sun")
+        hide_label("space")
+
+        show_status("Tare complete", 2000)
     else:
-        status_lbl.config(text="Tare failed")
+        show_status("Tare failed", 2000)
 
 # ----- Buttons -----
 def show_label_temporarily(which):
@@ -243,16 +278,27 @@ def update():
         if grams is None:
             value_lbl.config(text="No data")
         else:
+            # Display Earth weight.
             value_lbl.config(text=f"{int(round(grams))} g")
 
+            # Display calculated Moon weight if Moon is active.
             if show_moon:
                 moon_lbl.config(text=f"{int(grams * 0.165)} g on Moon")
+
+            # Display calculated Mars weight if Mars is active.
             if show_mars:
                 mars_lbl.config(text=f"{int(grams * 0.377)} g on Mars")
+
+             # Display calculated Jupiter weight if Jupiter is active.
+
             if show_jupiter:
                 jupiter_lbl.config(text=f"{int(grams * 2.528)} g on Jupiter")
+
+            # Display calculated Sun weight if Sun is active.
             if show_sun:
                 sun_lbl.config(text=f"{int(grams * 27.9)} g on the Sun")
+
+             # In space, the displayed weight is treated as 0 g.
             if show_space:
                 space_lbl.config(text="0 g in Space")
 
@@ -260,18 +306,25 @@ def update():
         value_lbl.config(text="Error")
         status_lbl.config(text=f"Update error: {e}")
 
+# Schedule this function to run again after UPDATE_MS milliseconds
     root.after(UPDATE_MS, update)
 
 def on_close():
     GPIO.cleanup()
     root.destroy()
 
+# Tell Tkinter what to do when the window closes.
 root.protocol("WM_DELETE_WINDOW", on_close)
+
 #added to the bottom of run cleanup on close instead of at top of program.
 root.bind("<Escape>", lambda e: on_close())
 root.after(500, lambda:root.focus_force())
 
-# ----- Start loops -----
+# ---------------- START PROGRAM LOOPS ----------------
+#Auto-zero the scale when the program first starts up
+root.after(1000,tare)
+
+# Start the weight update loop.
 update()
 check_tare_button()
 check_moon_button()
@@ -280,4 +333,6 @@ check_jupiter_button()
 check_sun_button()
 check_space_button()
 
+# Start the Tkinter event loop.
+# The program stays running here until the window is closed.
 root.mainloop()
